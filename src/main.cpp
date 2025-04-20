@@ -326,12 +326,14 @@ void lora_data_handler(void)
 		if (g_join_result)
 		{
 			MYLOG("APP", "Successfully joined network");
+			AT_PRINTF("+EVT:JOINED");
 		}
 		else
 		{
 			MYLOG("APP", "Join network failed");
+			AT_PRINTF("+EVT:JOIN_FAILED_TX_TIMEOUT");
 			/// \todo here join could be restarted.
-			// lmh_join();
+			lmh_join();
 		}
 	}
 
@@ -356,6 +358,22 @@ void lora_data_handler(void)
 			log_idx += 3;
 		}
 		MYLOG("APP", "%s", log_buff);
+
+		log_idx = 0;
+		for (int idx = 0; idx < g_rx_data_len; idx++)
+		{
+			sprintf(&log_buff[log_idx], "%02X", g_rx_lora_data[idx]);
+			log_idx += 2;
+		}
+
+		if (g_lorawan_settings.lorawan_enable)
+		{
+			AT_PRINTF("+EVT:RX_1:%d:%d:UNICAST:%d:%s", g_last_rssi, g_last_snr, g_last_fport, log_buff);
+		}
+		else
+		{
+			AT_PRINTF("+EVT:RXP2P:%d:%d:%s", g_last_rssi, g_last_snr, log_buff);
+		}
 	}
 
 	// LoRa TX finished handling
@@ -365,13 +383,22 @@ void lora_data_handler(void)
 
 		if (g_lorawan_settings.lorawan_enable)
 		{
-			if (g_lorawan_settings.confirmed_msg_enabled == LMH_UNCONFIRMED_MSG)
+			MYLOG("APP", "LoRa TX cycle %s", g_rx_fin_result ? "finished ACK" : "failed NAK");
+
+			if (g_lorawan_settings.lorawan_enable)
 			{
-				MYLOG("APP", "LPWAN TX cycle finished");
+				if (g_lorawan_settings.confirmed_msg_enabled == LMH_UNCONFIRMED_MSG)
+				{
+					AT_PRINTF("+EVT:TX_DONE");
+				}
+				else
+				{
+					AT_PRINTF("+EVT:%s", g_rx_fin_result ? "SEND_CONFIRMED_OK" : "SEND_CONFIRMED_FAILED");
+				}
 			}
 			else
 			{
-				MYLOG("APP", "LPWAN TX cycle %s", g_rx_fin_result ? "finished ACK" : "failed NAK");
+				AT_PRINTF("+EVT:TXP2P_DONE");
 			}
 			if (!g_rx_fin_result)
 			{
@@ -389,6 +416,7 @@ void lora_data_handler(void)
 		else
 		{
 			MYLOG("APP", "P2P TX finished");
+			AT_PRINTF("+EVT:TXP2P_DONE\n");
 		}
 	}
 }
